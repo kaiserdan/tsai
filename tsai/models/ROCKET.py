@@ -9,8 +9,8 @@ from ..data.external import *
 from .layers import *
 
 # Cell
-from sklearn.linear_model import RidgeClassifierCV, RidgeCV
-from sktime.transformations.panel.rocket import Rocket
+# from sklearn.linear_model import RidgeClassifierCV, RidgeCV
+# from sktime.transformations.panel.rocket import Rocket
 from numba import njit, prange
 
 # Cell
@@ -21,6 +21,9 @@ from numba import njit, prange
 # arXiv:1910.13051
 # Official repo: https://github.com/angus924/rocket
 
+Rocket = None
+RidgeCV = None
+RidgeClassifierCV = None
 # changes:
 # - added kss parameter to generate_kernels
 # - convert X to np.float64

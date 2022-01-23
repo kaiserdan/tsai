@@ -10,9 +10,8 @@ from ..data.external import *
 from .layers import *
 
 # Cell
-from sktime.transformations.panel.rocket import MiniRocketMultivariate
-from sklearn.linear_model import RidgeCV, RidgeClassifierCV
-from sklearn.ensemble import VotingClassifier, VotingRegressor
+# from sklearn.linear_model import RidgeCV, RidgeClassifierCV
+# from sklearn.ensemble import VotingClassifier, VotingRegressor
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -26,18 +25,19 @@ class MiniRocketClassifier(sklearn.pipeline.Pipeline):
         For a larger dataset, you can use MINIROCKET (in Pytorch).
         scoring = None --> defaults to accuracy.
         """
+        MiniRocketMultivariate = None
 
-        # Issue caused by sktime when upgraded 0.9.0 (changed num_features to num_kernels was resolved by
-        # Siva Sai (SivaAndMe in GiHub)https://github.com/timeseriesAI/tsai/pull/306)
-        self.steps = [('minirocketmultivariate', MiniRocketMultivariate(num_kernels=num_features,
-                                                                        max_dilations_per_kernel=max_dilations_per_kernel,
-                                                                        random_state=random_state)),
-                      ('ridgeclassifiercv', RidgeClassifierCV(alphas=alphas,
-                                                              normalize=normalize_features,
-                                                              scoring=scoring,
-                                                              class_weight=class_weight,
-                                                              **kwargs))]
-        store_attr()
+        # # Issue caused by sktime when upgraded 0.9.0 (changed num_features to num_kernels was resolved by
+        # # Siva Sai (SivaAndMe in GiHub)https://github.com/timeseriesAI/tsai/pull/306)
+        # self.steps = [('minirocketmultivariate', MiniRocketMultivariate(num_kernels=num_features,
+        #                                                                 max_dilations_per_kernel=max_dilations_per_kernel,
+        #                                                                 random_state=random_state)),
+        #               ('ridgeclassifiercv', RidgeClassifierCV(alphas=alphas,
+        #                                                       normalize=normalize_features,
+        #                                                       scoring=scoring,
+        #                                                       class_weight=class_weight,
+        #                                                       **kwargs))]
+        # # store_attr()
         self._validate_steps()
 
     def __repr__(self):
@@ -70,13 +70,13 @@ class MiniRocketRegressor(sklearn.pipeline.Pipeline):
         scoring = None --> defaults to r2.
         """
 
-        # Issue caused by sktime when upgraded 0.9.0 (changed num_features to num_kernels was resolved by
-        # Siva Sai (SivaAndMe in GiHub)https://github.com/timeseriesAI/tsai/pull/306)
-        self.steps = [('minirocketmultivariate', MiniRocketMultivariate(num_kernels=num_features,
-                                                                        max_dilations_per_kernel=max_dilations_per_kernel,
-                                                                        random_state=random_state)),
-                      ('ridgecv', RidgeCV(alphas=alphas, normalize=normalize_features, scoring=scoring, **kwargs))]
-        store_attr()
+        # # Issue caused by sktime when upgraded 0.9.0 (changed num_features to num_kernels was resolved by
+        # # Siva Sai (SivaAndMe in GiHub)https://github.com/timeseriesAI/tsai/pull/306)
+        # self.steps = [('minirocketmultivariate', MiniRocketMultivariate(num_kernels=num_features,
+        #                                                                 max_dilations_per_kernel=max_dilations_per_kernel,
+        #                                                                 random_state=random_state)),
+        #               ('ridgecv', RidgeCV(alphas=alphas, normalize=normalize_features, scoring=scoring, **kwargs))]
+        # store_attr()
         self._validate_steps()
 
     def __repr__(self):
@@ -99,11 +99,11 @@ def load_minirocket(fname, path='./models'):
     return output
 
 # Cell
-class MiniRocketVotingClassifier(VotingClassifier):
+class MiniRocketVotingClassifier():
     """Time series classification ensemble using MINIROCKET features, a linear classifier and majority voting"""
     def __init__(self, n_estimators=5, weights=None, n_jobs=-1, num_features=10_000, max_dilations_per_kernel=32, random_state=None,
                  alphas=np.logspace(-3, 3, 7), normalize_features=True, memory=None, verbose=False, scoring=None, class_weight=None, **kwargs):
-        store_attr()
+        # store_attr()
         estimators = [(f'est_{i}', MiniRocketClassifier(num_features=num_features, max_dilations_per_kernel=max_dilations_per_kernel,
                                                        random_state=random_state, alphas=alphas, normalize_features=normalize_features, memory=memory,
                                                        verbose=verbose, scoring=scoring, class_weight=class_weight, **kwargs))
@@ -114,12 +114,12 @@ class MiniRocketVotingClassifier(VotingClassifier):
         return f'MiniRocketVotingClassifier(n_estimators={self.n_estimators}, \nsteps={self.estimators[0][1].steps})'
 
     def save(self, fname=None, path='./models'):
-        fname = ifnone(fname, 'MiniRocketVotingClassifier')
+        # fname = ifnone(fname, 'MiniRocketVotingClassifier')
         path = Path(path)
         filename = path/fname
-        filename.parent.mkdir(parents=True, exist_ok=True)
-        with open(f'{filename}.pkl', 'wb') as output:
-            pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
+        # filename.parent.mkdir(parents=True, exist_ok=True)
+        # with open(f'{filename}.pkl', 'wb') as output:
+        #     pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
 
 # Cell
 def get_minirocket_preds(X, fname, path='./models', model=None):
@@ -130,11 +130,11 @@ def get_minirocket_preds(X, fname, path='./models', model=None):
     return model.predict(X)
 
 # Cell
-class MiniRocketVotingRegressor(VotingRegressor):
+class MiniRocketVotingRegressor():
     """Time series regression ensemble using MINIROCKET features, a linear regressor and a voting regressor"""
     def __init__(self, n_estimators=5, weights=None, n_jobs=-1, num_features=10_000, max_dilations_per_kernel=32, random_state=None,
                  alphas=np.logspace(-3, 3, 7), normalize_features=True, memory=None, verbose=False, scoring=None, **kwargs):
-        store_attr()
+        # store_attr()
         estimators = [(f'est_{i}', MiniRocketRegressor(num_features=num_features, max_dilations_per_kernel=max_dilations_per_kernel,
                                                       random_state=random_state, alphas=alphas, normalize_features=normalize_features, memory=memory,
                                                       verbose=verbose, scoring=scoring, **kwargs))
@@ -144,10 +144,10 @@ class MiniRocketVotingRegressor(VotingRegressor):
     def __repr__(self):
         return f'MiniRocketVotingRegressor(n_estimators={self.n_estimators}, \nsteps={self.estimators[0][1].steps})'
 
-    def save(self, fname=None, path='./models'):
-        fname = ifnone(fname, 'MiniRocketVotingRegressor')
-        path = Path(path)
-        filename = path/fname
-        filename.parent.mkdir(parents=True, exist_ok=True)
-        with open(f'{filename}.pkl', 'wb') as output:
-            pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
+    # def save(self, fname=None, path='./models'):
+        # fname = ifnone(fname, 'MiniRocketVotingRegressor')
+        # path = Path(path)
+        # filename = path/fname
+        # filename.parent.mkdir(parents=True, exist_ok=True)
+        # with open(f'{filename}.pkl', 'wb') as output:
+        #     pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
