@@ -20,7 +20,8 @@ __all__ = ['totensor', 'toarray', 'toL', 'to3dtensor', 'to2dtensor', 'to1dtensor
            'sincos_encoding', 'linear_encoding', 'encode_positions', 'sort_generator', 'get_subset_dict', 'create_dir',
            'remove_dir', 'named_partial', 'yaml2dict', 'str2list', 'str2index', 'get_cont_cols', 'get_cat_cols',
            'alphabet', 'ALPHABET', 'get_mapping', 'map_array', 'log_tfm', 'to_sincos_time', 'plot_feature_dist',
-           'rolling_moving_average', 'ffill_sequence', 'bfill_sequence', 'fbfill_sequence']
+           'rolling_moving_average', 'ffill_sequence', 'bfill_sequence', 'fbfill_sequence', 'dummify',
+           'analyze_feature', 'analyze_array']
 
 # Cell
 from .imports import *
@@ -292,9 +293,24 @@ def stack(o, axis=0, retain=True):
 
 def stack_pad(o, padding_value=np.nan):
     'Converts a an iterable into a numpy array using padding if necessary'
+    if not is_listy(o) or not is_array(o):
+        if not hasattr(o, "ndim"): o = np.asarray([o])
+        else: o = np.asarray(o)
+    o_ndim = 1
+    if o.ndim > 1:
+        o_ndim = o.ndim
+        o_shape = o.shape
+        o = o.flatten()
+    o = [oi if (is_array(oi) and oi.ndim > 0) or is_listy(oi) else [oi] for oi in o]
     row_length = len(max(o, key=len))
     result = np.full((len(o), row_length), padding_value)
-    for i,row in enumerate(o): result[i, :len(row)] = row
+    for i,row in enumerate(o):
+        result[i, :len(row)] = row
+    if o_ndim > 1:
+        if row_length == 1:
+            result = result.reshape(*o_shape)
+        else:
+            result = result.reshape(*o_shape, row_length)
     return result
 
 # Cell
@@ -1180,3 +1196,60 @@ def fbfill_sequence(o):
     o = ffill_sequence(o)
     o = bfill_sequence(o)
     return o
+
+# Cell
+def dummify(o:Union[np.ndarray, torch.Tensor], by_var:bool=True, inplace:bool=False, skip:Optional[list]=None, random_state=None):
+    """Shuffles an array-like object along all dimensions or dimension 1 (variables) if by_bar is True."""
+    if not inplace:
+        if isinstance(o, np.ndarray): o_dummy = o.copy()
+        elif isinstance(o, torch.Tensor): o_dummy = o.clone()
+    else: o_dummy = o
+    if by_var:
+        for k in progress_bar(range(o.shape[1]), leave=False):
+            if skip is not None and k in listify(skip): continue
+            o_dummy[:, k] = random_shuffle(o[:, k].flatten(), random_state=random_state).reshape(o[:, k].shape)
+    else:
+        o_dummy[:] = random_shuffle(o.flatten(), random_state=random_state).reshape(o.shape)
+    if not inplace:
+        return o_dummy
+
+# Cell
+def analyze_feature(feature, bins=100, density=False, feature_name=None, clip_outliers_plot=False, quantile_range=(25.0, 75.0),
+           percentiles=[1, 25, 50, 75, 99], text_len=12, figsize=(10,6)):
+    non_nan_feature = feature[~np.isnan(feature)]
+    nan_perc = np.isnan(feature).mean()
+    print(f"{'dtype':>{text_len}}: {feature.dtype}")
+    print(f"{'nan values':>{text_len}}: {nan_perc:.1%}")
+    print(f"{'max':>{text_len}}: {np.nanmax(feature)}")
+    for p in percentiles:
+        print(f"{p:>{text_len}.0f}: {get_percentile(feature, p)}")
+    print(f"{'min':>{text_len}}: {np.nanmin(feature)}")
+    min_outliers, max_outliers = get_outliers_IQR(feature, quantile_range=quantile_range)
+    print(f"{'outlier min':>{text_len}}: {min_outliers}")
+    print(f"{'outlier max':>{text_len}}: {max_outliers}")
+    print(f"{'outliers':>{text_len}}: {((non_nan_feature < min_outliers) | (non_nan_feature > max_outliers)).mean():.1%}")
+    print(f"{'mean':>{text_len}}: {np.nanmean(feature)}")
+    print(f"{'std':>{text_len}}: {np.nanstd(feature)}")
+    print(f"{'normal dist':>{text_len}}: {scipy.stats.normaltest(non_nan_feature, axis=0, nan_policy='propagate')[1] > .05}")
+    plt.figure(figsize=figsize)
+    if clip_outliers_plot:
+        plt.hist(np.clip(non_nan_feature, min_outliers, max_outliers), bins, density=density, color='lime', edgecolor='black')
+    else:
+        plt.hist(non_nan_feature, bins, density=density, color='lime', edgecolor='black')
+    plt.axvline(min_outliers, lw=1, ls='--', color='red')
+    plt.axvline(max_outliers, lw=1, ls='--', color='red')
+    plt.title(f"feature: {feature_name}")
+    plt.show()
+
+def analyze_array(o, bins=100, density=False, feature_names=None, clip_outliers_plot=False, quantile_range=(25.0, 75.0),
+           percentiles=[1, 25, 50, 75, 99], text_len=12, figsize=(10,6)):
+    if percentiles:
+        percentiles = np.sort(percentiles)[::-1]
+    print(f"{'array shape':>{text_len}}: {o.shape}")
+    if o.ndim > 1:
+        for f in range(o.shape[1]):
+            feature_name = f"{feature_names[f]}" if feature_names is not None else f
+            print(f"\n{f:3} {'feature':>{text_len - 4}}: {feature_name}\n")
+            analyze_feature(o[:, f].flatten(), feature_name=feature_name)
+    else:
+        analyze_feature(o.flatten(), feature_name=feature_names)

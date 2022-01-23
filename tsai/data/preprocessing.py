@@ -2,10 +2,10 @@
 
 __all__ = ['ToNumpyCategory', 'OneHot', 'TSNan2Value', 'Nan2Value', 'TSStandardize', 'TSNormalize', 'TSClipOutliers',
            'TSClip', 'TSRobustScale', 'TSDiff', 'TSLog', 'TSCyclicalPosition', 'TSLinearPosition', 'TSPosition',
-           'TSMissingness', 'TSPositionGaps', 'TSRollingMean', 'TSLogReturn', 'TSAdd', 'TSShrinkDataFrame',
-           'TSOneHotEncoder', 'TSCategoricalEncoder', 'TSDateTimeEncoder', 'default_date_attr', 'TSMissingnessEncoder',
-           'Preprocessor', 'StandardScaler', 'RobustScaler', 'Normalizer', 'BoxCox', 'YeoJohnshon', 'Quantile',
-           'ReLabeler']
+           'TSMissingness', 'TSPositionGaps', 'TSRollingMean', 'TSLogReturn', 'TSAdd', 'TSClipByVar',
+           'TSShrinkDataFrame', 'TSOneHotEncoder', 'TSCategoricalEncoder', 'TSDateTimeEncoder', 'default_date_attr',
+           'TSMissingnessEncoder', 'Preprocessor', 'StandardScaler', 'RobustScaler', 'Normalizer', 'BoxCox',
+           'YeoJohnshon', 'Quantile', 'ReLabeler']
 
 # Cell
 from ..imports import *
@@ -55,6 +55,8 @@ class TSNan2Value(Transform):
     order = 90
     def __init__(self, value=0, median=False, by_sample_and_var=True, sel_vars=None):
         store_attr()
+        if not ismin_torch("1.8"):
+            raise ValueError('This function only works with Pytorch>=1.8.')
 
     def encodes(self, o:TSTensor):
         if self.sel_vars is not None:
@@ -64,8 +66,8 @@ class TSNan2Value(Transform):
                     median = torch.nanmedian(o[:, self.sel_vars], dim=2, keepdim=True)[0].repeat(1, 1, o.shape[-1])
                     o[:, self.sel_vars][mask] = median[mask]
                 else:
-                    o[:, self.sel_vars] = torch_nan_to_num(o[:, self.sel_vars], torch.nanmedian(o[:, self.sel_vars]))
-            o[:, self.sel_vars] = torch_nan_to_num(o[:, self.sel_vars], self.value)
+                    o[:, self.sel_vars] = torch.nan_to_num(o[:, self.sel_vars], torch.nanmedian(o[:, self.sel_vars]))
+            o[:, self.sel_vars] = torch.nan_to_num(o[:, self.sel_vars], self.value)
         else:
             mask = torch.isnan(o)
             if mask.any() and self.median:
@@ -73,9 +75,10 @@ class TSNan2Value(Transform):
                     median = torch.nanmedian(o, dim=2, keepdim=True)[0].repeat(1, 1, o.shape[-1])
                     o[mask] = median[mask]
                 else:
-                    o = torch_nan_to_num(o, torch.nanmedian(o))
-            o = torch_nan_to_num(o, self.value)
+                    o = torch.nan_to_num(o, torch.nanmedian(o))
+            o = torch.nan_to_num(o, self.value)
         return o
+
 
 
 Nan2Value = TSNan2Value
@@ -542,6 +545,22 @@ class TSAdd(Transform):
     def encodes(self, o:TSTensor):
         return torch.add(o, self.add)
     def __repr__(self): return f'{self.__class__.__name__}(lag={self.lag}, pad={self.pad})'
+
+# Cell
+class TSClipByVar(Transform):
+    """Clip  batch of type `TSTensor` by variable
+
+    Args:
+        var_min_max: list of tuples containing variable index, min value (or None) and max value (or None)
+    """
+    order = 90
+    def __init__(self, var_min_max):
+        self.var_min_max = var_min_max
+
+    def encodes(self, o:TSTensor):
+        for v,m,M in self.var_min_max:
+            o[:, v] = torch.clamp(o[:, v], m, M)
+        return o
 
 # Cell
 from sklearn.base import BaseEstimator, TransformerMixin
